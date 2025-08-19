@@ -5,9 +5,10 @@ import dotenv from "dotenv";
 dotenv.config();
 const app = express();
 
-const client_id = process.env.f137d53f65ff4931b9aad40d240fc192;
-const client_secret = process.env.9c31664e67274f95ac2baa04ddf35744;
-const redirect_uri = process.env.https://projectxmusic.onrender.com/callback;
+// ✅ Load secrets from environment variables
+const client_id = process.env.SPOTIFY_CLIENT_ID;
+const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
+const redirect_uri = process.env.REDIRECT_URI;
 
 // ✅ Base route
 app.get("/", (req, res) => {
@@ -69,9 +70,6 @@ app.get("/callback", async (req, res) => {
 });
 
 // ✅ Start server
-app.listen(3000, () => {
-  console.log("✅ Server running on port 3000");
-});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
