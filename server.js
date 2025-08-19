@@ -16,7 +16,8 @@ app.get("/", (req, res) => {
 
 // ✅ Login route
 app.get("/login", (req, res) => {
-  const scope = "user-read-playback-state user-modify-playback-state";
+  const scope =
+    "user-read-playback-state user-modify-playback-state user-read-currently-playing";
   const auth_url = new URL("https://accounts.spotify.com/authorize");
   auth_url.searchParams.append("response_type", "code");
   auth_url.searchParams.append("client_id", client_id);
@@ -51,7 +52,6 @@ app.get("/callback", async (req, res) => {
       console.log("✅ Access Token:", data.access_token);
       console.log("🔁 Refresh Token:", data.refresh_token);
 
-      // For now, copy the refresh token into Render → Env Vars as SPOTIFY_REFRESH_TOKEN
       res.send(
         "🎶 Logged in successfully! Copy your refresh token from the logs and save it in Render as SPOTIFY_REFRESH_TOKEN."
       );
@@ -78,7 +78,7 @@ app.get("/refresh", async (req, res) => {
       },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: process.env.SPOTIFY_REFRESH_TOKEN, // set this in Render!
+        refresh_token: process.env.SPOTIFY_REFRESH_TOKEN,
       }),
     });
 
@@ -93,6 +93,58 @@ app.get("/refresh", async (req, res) => {
     }
   } catch (err) {
     console.error("❌ Refresh error:", err);
+    res.status(500).send("Internal Error: " + err.message);
+  }
+});
+
+// ✅ Play route (trigger track or playlist)
+app.get("/play", async (req, res) => {
+  const trackUri = req.query.track; // e.g. spotify:track:3n3Ppam7vgaVa1iaRUc9Lp
+  if (!trackUri) return res.status(400).send("❌ Please provide a track URI.");
+
+  try {
+    // Get fresh token
+    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization:
+          "Basic " +
+          Buffer.from(client_id + ":" + client_secret).toString("base64"),
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: process.env.SPOTIFY_REFRESH_TOKEN,
+      }),
+    });
+
+    const tokenData = await tokenResponse.json();
+    const access_token = tokenData.access_token;
+
+    // Send play command
+    const playResponse = await fetch(
+      "https://api.spotify.com/v1/me/player/play",
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uris: [trackUri], // Play the given track
+        }),
+      }
+    );
+
+    if (playResponse.status === 204) {
+      res.send("🎵 Now playing: " + trackUri);
+    } else {
+      const errorData = await playResponse.text();
+      console.error("❌ Play error:", errorData);
+      res.status(500).send("Failed to play: " + errorData);
+    }
+  } catch (err) {
+    console.error("❌ Play route error:", err);
     res.status(500).send("Internal Error: " + err.message);
   }
 });
