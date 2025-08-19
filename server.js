@@ -5,10 +5,9 @@ import dotenv from "dotenv";
 dotenv.config();
 const app = express();
 
-// ✅ Load secrets from environment variables
 const client_id = process.env.SPOTIFY_CLIENT_ID;
 const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
-const redirect_uri = process.env.REDIRECT_URI;
+const redirect_uri = process.env.REDIRECT_URI; // https://projectxmusic.onrender.com/callback
 
 // ✅ Base route
 app.get("/", (req, res) => {
@@ -26,7 +25,7 @@ app.get("/login", (req, res) => {
   res.redirect(auth_url.toString());
 });
 
-// ✅ Callback route
+// ✅ Callback route (first login)
 app.get("/callback", async (req, res) => {
   const code = req.query.code || null;
 
@@ -46,26 +45,55 @@ app.get("/callback", async (req, res) => {
       }),
     });
 
-    // ✅ Debug if request failed
-    if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text();
-      console.error("❌ Spotify Token Error:", errorText);
-      return res.status(500).send("Spotify login failed: " + errorText);
-    }
-
-    // ✅ Safe JSON parse
     const data = await tokenResponse.json();
 
-    if (data.access_token) {
+    if (data.access_token && data.refresh_token) {
       console.log("✅ Access Token:", data.access_token);
-      res.send("🎶 Logged in successfully! Check Render logs for your token.");
+      console.log("🔁 Refresh Token:", data.refresh_token);
+
+      // For now, copy the refresh token into Render → Env Vars as SPOTIFY_REFRESH_TOKEN
+      res.send(
+        "🎶 Logged in successfully! Copy your refresh token from the logs and save it in Render as SPOTIFY_REFRESH_TOKEN."
+      );
     } else {
-      console.error("❌ No access token in response:", data);
-      res.status(500).send("Spotify login failed. No access token.");
+      console.error("❌ Missing tokens:", data);
+      res.status(500).send("Spotify login failed. Missing tokens.");
     }
   } catch (err) {
     console.error("❌ Fetch error:", err);
     res.status(500).send("Internal Server Error: " + err.message);
+  }
+});
+
+// ✅ Refresh token route
+app.get("/refresh", async (req, res) => {
+  try {
+    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization:
+          "Basic " +
+          Buffer.from(client_id + ":" + client_secret).toString("base64"),
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: process.env.SPOTIFY_REFRESH_TOKEN, // set this in Render!
+      }),
+    });
+
+    const data = await tokenResponse.json();
+
+    if (data.access_token) {
+      console.log("✅ Refreshed Access Token:", data.access_token);
+      res.send("🎶 New Access Token: " + data.access_token);
+    } else {
+      console.error("❌ Refresh failed:", data);
+      res.status(500).send("Failed to refresh: " + JSON.stringify(data));
+    }
+  } catch (err) {
+    console.error("❌ Refresh error:", err);
+    res.status(500).send("Internal Error: " + err.message);
   }
 });
 
