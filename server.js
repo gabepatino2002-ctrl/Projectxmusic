@@ -7,9 +7,12 @@ const app = express();
 
 const client_id = process.env.f137d53f65ff4931b9aad40d240fc192;
 const client_secret = process.env.9c31664e67274f95ac2baa04ddf35744;
-const redirect_uri = process.env.;https://projectxmusic.onrender.com/callback
+const redirect_uri = process.env.https://projectxmusic.onrender.com/callback;
 
-// Step 1: Login
+app.get("/", (req, res) => {
+  res.send("✅ Project X Spotify server is running! Go to /login to start.");
+});
+
 app.get("/login", (req, res) => {
   const scope = "user-read-playback-state user-modify-playback-state";
   const auth_url = new URL("https://accounts.spotify.com/authorize");
@@ -20,7 +23,6 @@ app.get("/login", (req, res) => {
   res.redirect(auth_url.toString());
 });
 
-// Step 2: Callback
 app.get("/callback", async (req, res) => {
   const code = req.query.code || null;
 
@@ -42,19 +44,13 @@ app.get("/callback", async (req, res) => {
   const data = await tokenResponse.json();
 
   if (data.access_token) {
-    res.send("✅ Logged in! You can now control Spotify.");
+    res.send("✅ Logged in! Check your Render logs for your Access Token.");
     console.log("Access Token:", data.access_token);
   } else {
     res.send("❌ Login failed: " + JSON.stringify(data));
   }
 });
 
-// Root route
-app.get("/", (req, res) => {
-  res.send("✅ Project X Spotify server is running! Go to /login to start.");
-});
-
-// Start server
 app.listen(3000, () => {
   console.log("✅ Server running on port 3000");
 });
