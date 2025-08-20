@@ -1,0 +1,52 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Project X Combat API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/combat/start": {
+      "post": {
+        "description": "Start a combat encounter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "universe": { "type": "string" },
+                  "enemies": {
+                    "type": "array",
+                    "items": { "type": "object" }
+                  },
+                  "theme": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Combat started" } }
+      }
+    },
+    "/combat/end": {
+      "post": {
+        "description": "End combat encounter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "result": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Combat ended" } }
+      }
+    }
+  }
+}
