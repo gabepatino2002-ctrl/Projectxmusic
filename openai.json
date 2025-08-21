@@ -2,7 +2,7 @@
   "openapi": "3.0.1",
   "info": {
     "title": "ProjectX Music Director API",
-    "description": "Controls Spotify playback for Project X battles. Supports auto-picking tracks, manual play/pause, and phase-based transitions.",
+    "description": "Controls Spotify playback for Project X battles. Supports manual playback, pausing, boss phase transitions, and AI-driven autoTrack selection.",
     "version": "1.0.0"
   },
   "servers": [
@@ -13,8 +13,8 @@
   "paths": {
     "/play": {
       "post": {
-        "summary": "Play a Spotify track",
-        "description": "Start playback of a specific track by Spotify URI.",
+        "summary": "Play a specific Spotify track by URI",
+        "operationId": "playTrack",
         "requestBody": {
           "required": true,
           "content": {
@@ -24,7 +24,7 @@
                 "properties": {
                   "uri": {
                     "type": "string",
-                    "description": "Spotify URI of the track to play"
+                    "example": "spotify:track:4uLU6hMCjMI75M1A2tKUQC"
                   }
                 },
                 "required": ["uri"]
@@ -34,26 +34,49 @@
         },
         "responses": {
           "200": {
-            "description": "Track is playing"
+            "description": "Track started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "action": { "type": "string" },
+                    "uri": { "type": "string" }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/pause": {
       "post": {
-        "summary": "Pause playback",
-        "description": "Pause the current Spotify playback.",
+        "summary": "Pause current Spotify playback",
+        "operationId": "pausePlayback",
         "responses": {
           "200": {
-            "description": "Playback paused"
+            "description": "Playback paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "action": { "type": "string" }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/event": {
       "post": {
-        "summary": "Trigger battle phase change",
-        "description": "Change to a different section of the loop based on battle phase (intro, phase1, phase2, climax, victory).",
+        "summary": "Handle a battle event or boss phase change",
+        "operationId": "battleEvent",
         "requestBody": {
           "required": true,
           "content": {
@@ -63,8 +86,7 @@
                 "properties": {
                   "phase": {
                     "type": "string",
-                    "enum": ["intro", "phase1", "phase2", "climax", "victory"],
-                    "description": "Which phase of the fight is active."
+                    "example": "phase2"
                   }
                 },
                 "required": ["phase"]
@@ -74,15 +96,27 @@
         },
         "responses": {
           "200": {
-            "description": "Phase music updated"
+            "description": "Event handled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "action": { "type": "string" },
+                    "phase": { "type": "string" }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/autoTrack": {
       "post": {
-        "summary": "Auto-select a track",
-        "description": "AI selects a Spotify track from the entire library that best fits the given battle context.",
+        "summary": "Auto-select a Spotify track based on mood and context",
+        "operationId": "autoTrack",
         "requestBody": {
           "required": true,
           "content": {
@@ -92,11 +126,11 @@
                 "properties": {
                   "mood": {
                     "type": "string",
-                    "description": "Mood of the battle, e.g. tense, heroic, desperate, victory"
+                    "example": "intense"
                   },
                   "context": {
                     "type": "string",
-                    "description": "Narrative context, e.g. boss intro, final phase, ambush"
+                    "example": "boss fight"
                   }
                 },
                 "required": ["mood", "context"]
@@ -106,7 +140,26 @@
         },
         "responses": {
           "200": {
-            "description": "AI-chosen track playing"
+            "description": "Track auto-selected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string" },
+                    "action": { "type": "string" },
+                    "chosen": {
+                      "type": "object",
+                      "properties": {
+                        "uri": { "type": "string" },
+                        "title": { "type": "string" },
+                        "artist": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
