@@ -1,156 +1,125 @@
 import express from "express";
 import fetch from "node-fetch";
-import dotenv from "dotenv";
+import bodyParser from "body-parser";
+import SpotifyWebApi from "spotify-web-api-node";
 
-dotenv.config();
 const app = express();
+app.use(bodyParser.json());
 
-const client_id = process.env.SPOTIFY_CLIENT_ID;
-const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
-const redirect_uri = process.env.REDIRECT_URI; // https://projectxmusic.onrender.com/callback
-
-// ✅ Base route
-app.get("/", (req, res) => {
-  res.send("✅ Project X Spotify server is running! Go to /login to start.");
+// Setup Spotify API
+const spotifyApi = new SpotifyWebApi({
+  clientId: process.env.SPOTIFY_CLIENT_ID,
+  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+  redirectUri: "http://localhost:8888/callback"
 });
 
-// ✅ Login route
-app.get("/login", (req, res) => {
-  const scope =
-    "user-read-playback-state user-modify-playback-state user-read-currently-playing";
-  const auth_url = new URL("https://accounts.spotify.com/authorize");
-  auth_url.searchParams.append("response_type", "code");
-  auth_url.searchParams.append("client_id", client_id);
-  auth_url.searchParams.append("scope", scope);
-  auth_url.searchParams.append("redirect_uri", redirect_uri);
-  res.redirect(auth_url.toString());
-});
+let bossState = {};
+let accessToken = null;
 
-// ✅ Callback route (first login)
-app.get("/callback", async (req, res) => {
-  const code = req.query.code || null;
-
+// Refresh token
+async function refreshAccessToken() {
   try {
-    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization:
-          "Basic " +
-          Buffer.from(client_id + ":" + client_secret).toString("base64"),
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code: code,
-        redirect_uri: redirect_uri,
-      }),
-    });
-
-    const data = await tokenResponse.json();
-
-    if (data.access_token && data.refresh_token) {
-      console.log("✅ Access Token:", data.access_token);
-      console.log("🔁 Refresh Token:", data.refresh_token);
-
-      res.send(
-        "🎶 Logged in successfully! Copy your refresh token from the logs and save it in Render as SPOTIFY_REFRESH_TOKEN."
-      );
-    } else {
-      console.error("❌ Missing tokens:", data);
-      res.status(500).send("Spotify login failed. Missing tokens.");
-    }
+    const data = await spotifyApi.clientCredentialsGrant();
+    accessToken = data.body.access_token;
+    spotifyApi.setAccessToken(accessToken);
+    console.log("✅ Refreshed Spotify access token");
   } catch (err) {
-    console.error("❌ Fetch error:", err);
-    res.status(500).send("Internal Server Error: " + err.message);
+    console.error("❌ Error refreshing token", err);
   }
-});
+}
+setInterval(refreshAccessToken, 1000 * 60 * 55);
+refreshAccessToken();
 
-// ✅ Refresh token route
-app.get("/refresh", async (req, res) => {
-  try {
-    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization:
-          "Basic " +
-          Buffer.from(client_id + ":" + client_secret).toString("base64"),
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: process.env.SPOTIFY_REFRESH_TOKEN,
-      }),
-    });
+// -----------------------
+// Helper: auto-generate loop points
+// -----------------------
+function getLoopPoints(durationMs) {
+  const introEnd = Math.min(30000, durationMs);       // Intro → 30s
+  const buildEnd = Math.min(90000, durationMs);       // Build-Up → 90s
+  const climaxEnd = Math.min(150000, durationMs);     // Climax → 150s
+  const finalEnd = durationMs;                        // Final → end
 
-    const data = await tokenResponse.json();
+  return {
+    intro: { start: 0, end: introEnd },
+    build: { start: introEnd, end: buildEnd },
+    climax: { start: buildEnd, end: climaxEnd },
+    final: { start: climaxEnd, end: finalEnd }
+  };
+}
 
-    if (data.access_token) {
-      console.log("✅ Refreshed Access Token:", data.access_token);
-      res.send("🎶 New Access Token: " + data.access_token);
-    } else {
-      console.error("❌ Refresh failed:", data);
-      res.status(500).send("Failed to refresh: " + JSON.stringify(data));
-    }
-  } catch (err) {
-    console.error("❌ Refresh error:", err);
-    res.status(500).send("Internal Error: " + err.message);
-  }
-});
-
-// ✅ Play route (trigger track or playlist)
-app.get("/play", async (req, res) => {
-  const trackUri = req.query.track; // e.g. spotify:track:3n3Ppam7vgaVa1iaRUc9Lp
-  if (!trackUri) return res.status(400).send("❌ Please provide a track URI.");
-
-  try {
-    // Get fresh token
-    const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization:
-          "Basic " +
-          Buffer.from(client_id + ":" + client_secret).toString("base64"),
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: process.env.SPOTIFY_REFRESH_TOKEN,
-      }),
-    });
-
-    const tokenData = await tokenResponse.json();
-    const access_token = tokenData.access_token;
-
-    // Send play command
-    const playResponse = await fetch(
-      "https://api.spotify.com/v1/me/player/play",
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          uris: [trackUri], // Play the given track
-        }),
+// Loop a section continuously
+function startLoop(trackUri, startMs, endMs) {
+  const loopInterval = setInterval(async () => {
+    try {
+      const playback = await spotifyApi.getMyCurrentPlaybackState();
+      if (
+        playback.body.is_playing &&
+        playback.body.item.uri === trackUri &&
+        playback.body.progress_ms >= endMs
+      ) {
+        await spotifyApi.seek(startMs);
       }
-    );
-
-    if (playResponse.status === 204) {
-      res.send("🎵 Now playing: " + trackUri);
-    } else {
-      const errorData = await playResponse.text();
-      console.error("❌ Play error:", errorData);
-      res.status(500).send("Failed to play: " + errorData);
+    } catch (err) {
+      console.error("Loop error:", err.message);
+      clearInterval(loopInterval);
     }
+  }, 1000);
+}
+
+// -----------------------
+// Endpoints
+// -----------------------
+
+// Boss event with automatic phase loops
+app.post("/event", async (req, res) => {
+  const { event, context } = req.body;
+
+  try {
+    // Pick a track automatically based on context
+    if (!bossState.track) {
+      const searchRes = await spotifyApi.searchTracks(`epic battle ${context}`, { limit: 1 });
+      const track = searchRes.body.tracks.items[0];
+      if (!track) return res.status(404).json({ error: "No suitable track found" });
+
+      bossState.track = track;
+      bossState.loopPoints = getLoopPoints(track.duration_ms);
+      console.log(`🎵 Selected boss track: ${track.name} by ${track.artists.map(a => a.name).join(", ")}`);
+    }
+
+    const trackUri = bossState.track.uri;
+    let phase = null;
+
+    if (event === "boss_phase_1") phase = "intro";
+    if (event === "boss_phase_2") phase = "build";
+    if (event === "boss_phase_3") phase = "climax";
+    if (event === "boss_final") phase = "final";
+
+    if (!phase) return res.status(400).json({ error: "Invalid phase event" });
+
+    const { start, end } = bossState.loopPoints[phase];
+
+    // Start playback at phase start
+    await spotifyApi.play({ uris: [trackUri], position_ms: start });
+
+    // Begin loop
+    startLoop(trackUri, start, end);
+
+    res.json({
+      message: `🎶 Now playing ${phase.toUpperCase()} loop for ${bossState.track.name}`,
+      track: {
+        name: bossState.track.name,
+        artist: bossState.track.artists.map(a => a.name).join(", "),
+        uri: trackUri,
+        phase
+      }
+    });
   } catch (err) {
-    console.error("❌ Play route error:", err);
-    res.status(500).send("Internal Error: " + err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ Start server
+// -----------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`🎵 Project X Music server running on port ${PORT}`);
 });
