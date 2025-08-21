@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Project X Cinematic Engine",
+  "name_for_model": "projectx_cinematic_engine",
+  "description_for_human": "An engine that dynamically generates AI voices for characters and controls adaptive Spotify music (battle themes, boss phases, downtime, and victory).",
+  "description_for_model": "Use this API to automatically generate character voice lines and control adaptive Spotify music during gameplay. Supports contextual battle music selection, boss phase transitions, random battle tracks from Spotify’s library, victory themes, and voice ducking during dialogue.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://projectxmusic.onrender.com/openapi.yaml"
+  },
+  "logo_url": "https://i.imgur.com/GrA5X6R.png",
+  "contact_email": "support@projectx.com",
+  "legal_info_url": "https://projectx.com/terms"
+}
