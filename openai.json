@@ -1,13 +1,19 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "Project X Combat API",
+    "title": "Project X Music API",
+    "description": "Controls Spotify battle music playback and boss phase loops.",
     "version": "1.0.0"
   },
+  "servers": [
+    {
+      "url": "https://projectxmusic.onrender.com"
+    }
+  ],
   "paths": {
-    "/combat/start": {
+    "/play": {
       "post": {
-        "description": "Start a combat encounter",
+        "summary": "Play a Spotify track",
         "requestBody": {
           "required": true,
           "content": {
@@ -15,23 +21,29 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "universe": { "type": "string" },
-                  "enemies": {
-                    "type": "array",
-                    "items": { "type": "object" }
-                  },
-                  "theme": { "type": "string" }
-                }
+                  "track_uri": { "type": "string" }
+                },
+                "required": ["track_uri"]
               }
             }
           }
         },
-        "responses": { "200": { "description": "Combat started" } }
+        "responses": {
+          "200": { "description": "Track started." }
+        }
       }
     },
-    "/combat/end": {
+    "/pause": {
       "post": {
-        "description": "End combat encounter",
+        "summary": "Pause current track",
+        "responses": {
+          "200": { "description": "Track paused." }
+        }
+      }
+    },
+    "/seek": {
+      "post": {
+        "summary": "Seek to position in track",
         "requestBody": {
           "required": true,
           "content": {
@@ -39,13 +51,40 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "result": { "type": "string" }
-                }
+                  "position_ms": { "type": "integer" }
+                },
+                "required": ["position_ms"]
               }
             }
           }
         },
-        "responses": { "200": { "description": "Combat ended" } }
+        "responses": {
+          "200": { "description": "Seeked to position." }
+        }
+      }
+    },
+    "/loopmap": {
+      "post": {
+        "summary": "Get loop mapping for track phases",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "track_uri": { "type": "string" }
+                },
+                "required": ["track_uri"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phase loop mapping returned."
+          }
+        }
       }
     }
   }
