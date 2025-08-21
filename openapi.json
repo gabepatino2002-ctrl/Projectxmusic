@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "ProjectX Music API",
-    "version": "1.0.0",
-    "description": "API for controlling Spotify playback dynamically during Project X battles and events."
+    "title": "Project X Voices & Music API",
+    "description": "Manage battle states, auto-select music from Spotify, and generate ElevenLabs voices with synced emotions.",
+    "version": "1.0.0"
   },
   "servers": [
     {
@@ -11,10 +11,11 @@
     }
   ],
   "paths": {
-    "/play": {
+    "/setState": {
       "post": {
-        "summary": "Play a specific Spotify track",
-        "description": "Plays a given Spotify track using its URI.",
+        "summary": "Set the current battle state (music + emotion)",
+        "description": "Updates the battle state. Automatically changes Spotify playback to the correct track and adjusts emotion syncing for all voices.",
+        "operationId": "setState",
         "requestBody": {
           "required": true,
           "content": {
@@ -22,90 +23,31 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "trackUri": {
+                  "state": {
                     "type": "string",
-                    "example": "spotify:track:3n3Ppam7vgaVa1iaRUc9Lp"
+                    "enum": [
+                      "exploration",
+                      "battle",
+                      "boss1",
+                      "boss2",
+                      "boss3",
+                      "victory",
+                      "defeat"
+                    ],
+                    "example": "battle"
                   }
                 },
-                "required": ["trackUri"]
+                "required": ["state"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Track playback started"
-          }
-        }
-      }
-    },
-    "/pause": {
-      "post": {
-        "summary": "Pause Spotify playback",
-        "description": "Pauses the current Spotify track.",
-        "responses": {
-          "200": {
-            "description": "Playback paused"
-          }
-        }
-      }
-    },
-    "/event": {
-      "post": {
-        "summary": "Trigger a battle/event theme",
-        "description": "Sets the battle music depending on the type of event.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "eventType": {
-                    "type": "string",
-                    "example": "boss_phase_1",
-                    "description": "Type of event, e.g. boss_phase_1, boss_phase_2, ambush, victory"
-                  }
-                },
-                "required": ["eventType"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Event music triggered"
-          }
-        }
-      }
-    },
-    "/autoTrack": {
-      "post": {
-        "summary": "Automatically select fitting music",
-        "description": "GPT chooses a track from Spotify that fits the current battle or scene.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sceneDescription": {
-                    "type": "string",
-                    "example": "An intense fight against a towering demon lord in a collapsing castle"
-                  }
-                },
-                "required": ["sceneDescription"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Track automatically selected and playing"
-          }
-        }
-      }
-    }
-  }
-}
+            "description": "State updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "
