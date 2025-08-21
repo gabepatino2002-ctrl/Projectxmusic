@@ -1,17 +1,17 @@
 {
   "schema_version": "v1",
-  "name_for_human": "Project X Cinematic Engine",
-  "name_for_model": "projectx_cinematic_engine",
-  "description_for_human": "An engine that dynamically generates AI voices for characters and controls adaptive Spotify music (battle themes, boss phases, downtime, and victory).",
-  "description_for_model": "Use this API to automatically generate character voice lines and control adaptive Spotify music during gameplay. Supports contextual battle music selection, boss phase transitions, random battle tracks from Spotify’s library, victory themes, and voice ducking during dialogue.",
+  "name_for_human": "Project X Voices & Music",
+  "name_for_model": "projectx_voices_music",
+  "description_for_human": "Controls Spotify battle music and ElevenLabs character voices with emotional syncing.",
+  "description_for_model": "Use this API to manage battle states (exploration, battle, boss phases, victory, defeat), play fitting Spotify tracks, and generate character voice lines with the correct emotional tone via ElevenLabs.",
   "auth": {
     "type": "none"
   },
   "api": {
     "type": "openapi",
-    "url": "https://projectxmusic.onrender.com/openapi.yaml"
+    "url": "https://projectxmusic.onrender.com/openapi.json"
   },
-  "logo_url": "https://i.imgur.com/GrA5X6R.png",
-  "contact_email": "support@projectx.com",
-  "legal_info_url": "https://projectx.com/terms"
+  "logo_url": "https://i.ibb.co/JmSvhvn/projectx-logo.png",
+  "contact_email": "support@projectx.ai",
+  "legal_info_url": "https://projectx.ai/legal"
 }
