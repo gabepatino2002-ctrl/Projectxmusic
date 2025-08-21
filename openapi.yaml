@@ -1,0 +1,64 @@
+openapi: 3.0.1
+info:
+  title: Project X Cinematic Engine
+  version: "1.0.0"
+  description: API for generating ElevenLabs voices and controlling Spotify music with cinematic transitions.
+
+servers:
+  - url: https://projectxmusic.onrender.com
+
+paths:
+  /generate-voice:
+    post:
+      summary: Generate an AI voice line for a character.
+      description: Generates voice audio from ElevenLabs for a given character. Music will automatically duck during playback and restore afterward.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: The dialogue or line to be spoken.
+                voice_id:
+                  type: string
+                  description: ElevenLabs voice ID for the character.
+              required:
+                - text
+                - voice_id
+      responses:
+        "200":
+          description: Audio file of generated voice.
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+
+  /music-event:
+    post:
+      summary: Trigger a music event.
+      description: Plays music based on battle context (battle start, boss phase, victory, downtime). Automatically fades between tracks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                context:
+                  type: string
+                  enum: [battle_start, boss_phase_1, boss_phase_2, boss_phase_3, victory, downtime, random_battle]
+                  description: The gameplay context that determines what type of music should play.
+      responses:
+        "200":
+          description: Confirmation of track change.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
