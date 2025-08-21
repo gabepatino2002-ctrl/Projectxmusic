@@ -1,17 +1,121 @@
 {
-  "schema_version": "v1",
-  "name_for_human": "Project X Voices & Music",
-  "name_for_model": "projectx_voices_music",
-  "description_for_human": "Controls Spotify battle music and ElevenLabs character voices with emotional syncing.",
-  "description_for_model": "Use this API to manage battle states (exploration, battle, boss phases, victory, defeat), play fitting Spotify tracks, and generate character voice lines with the correct emotional tone via ElevenLabs.",
-  "auth": {
-    "type": "none"
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Project X Unified Music & Voice API",
+    "version": "1.0.0",
+    "description": "API for dynamic battle music (Spotify) and character voices (ElevenLabs) with emotion support for Project X."
   },
-  "api": {
-    "type": "openapi",
-    "url": "https://projectxmusic.onrender.com/openapi.json"
-  },
-  "logo_url": "https://i.ibb.co/JmSvhvn/projectx-logo.png",
-  "contact_email": "support@projectx.ai",
-  "legal_info_url": "https://projectx.ai/legal"
+  "servers": [
+    {
+      "url": "https://projectxmusic.onrender.com"
+    }
+  ],
+  "paths": {
+    "/battle-music": {
+      "post": {
+        "summary": "Start or transition battle music",
+        "description": "Automatically selects a fitting track from Spotify based on battle state (battle, boss1/2/3, victory, defeat). Includes fade in/out transitions.",
+        "operationId": "playBattleMusic",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": ["battle", "boss1", "boss2", "boss3", "victory", "defeat"],
+                    "description": "The current combat state to adapt music to."
+                  }
+                },
+                "required": ["state"]
+              },
+              "example": {
+                "state": "boss2"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Music started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Music playback failed"
+          }
+        }
+      }
+    },
+    "/speak": {
+      "post": {
+        "summary": "Generate character voice line",
+        "description": "Synthesizes speech for a specific character using ElevenLabs, with emotion overlays (neutral, angry, sad, excited, heroic, etc).",
+        "operationId": "generateVoiceLine",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "character": {
+                    "type": "string",
+                    "enum": ["Simba", "Yuji", "Legoshi", "Louis", "Haru"],
+                    "description": "The character whose voice to generate."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "The dialogue line to be spoken."
+                  },
+                  "emotion": {
+                    "type": "string",
+                    "enum": ["neutral", "angry", "sad", "excited", "heroic", "gentle", "defiant"],
+                    "default": "neutral",
+                    "description": "Optional emotional tone overlay for the voice."
+                  }
+                },
+                "required": ["character", "text"]
+              },
+              "example": {
+                "character": "Simba",
+                "text": "Courage isn’t the absence of fear—it’s the strength to stand when others cannot.",
+                "emotion": "heroic"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audio generated successfully",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid character input"
+          },
+          "500": {
+            "description": "Voice synthesis failed"
+          }
+        }
+      }
+    }
+  }
 }
