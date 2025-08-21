@@ -1,8 +1,8 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "Project X Music API",
-    "description": "Controls Spotify battle music playback and boss phase loops.",
+    "title": "ProjectX Music Director API",
+    "description": "Controls Spotify playback for Project X battles. Supports auto-picking tracks, manual play/pause, and phase-based transitions.",
     "version": "1.0.0"
   },
   "servers": [
@@ -14,6 +14,7 @@
     "/play": {
       "post": {
         "summary": "Play a Spotify track",
+        "description": "Start playback of a specific track by Spotify URI.",
         "requestBody": {
           "required": true,
           "content": {
@@ -21,68 +22,91 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "track_uri": { "type": "string" }
+                  "uri": {
+                    "type": "string",
+                    "description": "Spotify URI of the track to play"
+                  }
                 },
-                "required": ["track_uri"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Track started." }
-        }
-      }
-    },
-    "/pause": {
-      "post": {
-        "summary": "Pause current track",
-        "responses": {
-          "200": { "description": "Track paused." }
-        }
-      }
-    },
-    "/seek": {
-      "post": {
-        "summary": "Seek to position in track",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "position_ms": { "type": "integer" }
-                },
-                "required": ["position_ms"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": { "description": "Seeked to position." }
-        }
-      }
-    },
-    "/loopmap": {
-      "post": {
-        "summary": "Get loop mapping for track phases",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "track_uri": { "type": "string" }
-                },
-                "required": ["track_uri"]
+                "required": ["uri"]
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Phase loop mapping returned."
+            "description": "Track is playing"
+          }
+        }
+      }
+    },
+    "/pause": {
+      "post": {
+        "summary": "Pause playback",
+        "description": "Pause the current Spotify playback.",
+        "responses": {
+          "200": {
+            "description": "Playback paused"
+          }
+        }
+      }
+    },
+    "/event": {
+      "post": {
+        "summary": "Trigger battle phase change",
+        "description": "Change to a different section of the loop based on battle phase (intro, phase1, phase2, climax, victory).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phase": {
+                    "type": "string",
+                    "enum": ["intro", "phase1", "phase2", "climax", "victory"],
+                    "description": "Which phase of the fight is active."
+                  }
+                },
+                "required": ["phase"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Phase music updated"
+          }
+        }
+      }
+    },
+    "/autoTrack": {
+      "post": {
+        "summary": "Auto-select a track",
+        "description": "AI selects a Spotify track from the entire library that best fits the given battle context.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mood": {
+                    "type": "string",
+                    "description": "Mood of the battle, e.g. tense, heroic, desperate, victory"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Narrative context, e.g. boss intro, final phase, ambush"
+                  }
+                },
+                "required": ["mood", "context"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI-chosen track playing"
           }
         }
       }
