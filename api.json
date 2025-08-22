@@ -1,17 +1,229 @@
 {
-  "schema_version": "v1",
-  "name_for_human": "Project X Control",
-  "name_for_model": "projectx_control",
-  "description_for_human": "Control battle music with Spotify and generate AI voices with ElevenLabs (including emotions) for Project X.",
-  "description_for_model": "Use this to play context-based battle music from Spotify or generate character voices with emotions via ElevenLabs. Choose music automatically based on battle context (boss, enemy, ambient, etc.) or play a specific track by URI. Generate voices by passing character name, text, and optional emotion (e.g., 'angry', 'calm').",
+  "name": "projectx-music-voices",
+  "version": "1.0",
+  "description": "Music + Voices microservice for Project X: ElevenLabs TTS + Spotify playback control, phase looping, auto-selection, and voice catalog.",
+  "base_url": "https://projectxmusic.onrender.com/",
   "auth": {
-    "type": "none"
+    "type": "bearer",
+    "header_name": "Authorization",
+    "note": "Provide 'Bearer <ACTION_TOKEN>' if ACTION_TOKEN is configured on server"
   },
-  "api": {
-    "type": "openapi",
-    "url": "https://projectxmusic.onrender.com/openapi.json"
-  },
-  "logo_url": "https://cdn-icons-png.flaticon.com/512/727/727245.png",
-  "contact_email": "support@projectx.com",
-  "legal_info_url": "https://projectxmusic.onrender.com/legal"
+  "endpoints": [
+    {
+      "name": "Health",
+      "method": "GET",
+      "path": "/",
+      "description": "Health check / server info. Returns {ok, service, version}."
+    },
+    {
+      "name": "GetVoices",
+      "method": "GET",
+      "path": "/voices",
+      "description": "Return the configured character voice catalog (voice ids, metadata, sample phrases, emotion presets)."
+    },
+    {
+      "name": "TTS_Generate",
+      "method": "POST",
+      "path": "/tts",
+      "description": "Synthesize speech to audio for a given character voice. Returns audio URL or audio binary (base64).",
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "voice_id": { "type": "string" },
+          "text": { "type": "string" },
+          "voice_settings": {
+            "type": "object",
+            "properties": {
+              "stability": { "type": "number" },
+              "similarity_boost": { "type": "number" },
+              "style": { "type": "string" },
+              "emotion": { "type": "string" }
+            }
+          },
+          "format": { "type": "string", "enum": ["audio/mpeg", "audio/wav"], "default": "audio/mpeg" },
+          "language": { "type": "string", "default": "en" },
+          "persist": { "type": "boolean", "description": "If true, store generated audio and return a persistent URL." }
+        },
+        "required": ["voice_id", "text"]
+      },
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "audio_url": { "type": "string" },
+          "audio_base64": { "type": "string" },
+          "duration_ms": { "type": "integer" },
+          "voice_id": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "TTS_Stream",
+      "method": "POST",
+      "path": "/tts/stream",
+      "description": "Websocket or streaming endpoint to stream audio chunks (optional depending on implementation).",
+      "notes": "If your server supports streaming, expose a websocket/streaming endpoint here; otherwise omit."
+    },
+    {
+      "name": "PlayTrack",
+      "method": "POST",
+      "path": "/play",
+      "description": "Play a Spotify URI immediately on the connected player. Supports phase tags and loop settings.",
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "spotify_uri": { "type": "string" },
+          "start_ms": { "type": "integer", "description": "Offset into track to begin (ms)" },
+          "loop": { "type": "boolean", "description": "Loop this segment until changed" },
+          "phase": { "type": "string", "description": "Optional phase tag (intro|bridge|chorus|drop|boss_final|victory|defeat)" },
+          "loop_segment": { "type": "object", "properties": { "start_ms": { "type": "integer" }, "end_ms": { "type": "integer" } } },
+          "fade_ms": { "type": "integer", "description": "Fade-in time (ms)" }
+        },
+        "required": ["spotify_uri"]
+      },
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "playing_uri": { "type": "string" },
+          "phase": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "QueueTrack",
+      "method": "POST",
+      "path": "/queue",
+      "description": "Add a track to the play queue (with optional priority).",
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "spotify_uri": { "type": "string" },
+          "priority": { "type": "integer", "description": "Higher = play sooner" },
+          "phase_tag": { "type": "string" }
+        },
+        "required": ["spotify_uri"]
+      }
+    },
+    {
+      "name": "PausePlayback",
+      "method": "POST",
+      "path": "/pause",
+      "description": "Pause playback on the connected Spotify device.",
+      "request_schema": { "type": "object", "properties": { "fade_ms": { "type": "integer" } } }
+    },
+    {
+      "name": "ResumePlayback",
+      "method": "POST",
+      "path": "/resume",
+      "description": "Resume playback (optionally fade in).",
+      "request_schema": { "type": "object", "properties": { "fade_ms": { "type": "integer" } } }
+    },
+    {
+      "name": "StopPlayback",
+      "method": "POST",
+      "path": "/stop",
+      "description": "Stop playback and clear loop/phase settings."
+    },
+    {
+      "name": "SkipTrack",
+      "method": "POST",
+      "path": "/skip",
+      "description": "Skip to next track or jump to a queued track.",
+      "request_schema": { "type": "object", "properties": { "to_uri": { "type": "string" } } }
+    },
+    {
+      "name": "SetPhase",
+      "method": "POST",
+      "path": "/phase",
+      "description": "Set the current phase (e.g., boss_phase_1 -> boss_phase_2) and instruct the player to fade/loop using provided segment(s).",
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "phase": { "type": "string", "description": "Phase name (intro, phase1, phase2, final, victory...)" },
+          "loop_segment": { "type": "object", "properties": { "start_ms": { "type": "integer" }, "end_ms": { "type": "integer" } } },
+          "fade_out_ms": { "type": "integer" },
+          "fade_in_ms": { "type": "integer" }
+        },
+        "required": ["phase"]
+      }
+    },
+    {
+      "name": "AutoSelectTrack",
+      "method": "POST",
+      "path": "/auto_select",
+      "description": "AI endpoint: given a battle context, return an appropriate Spotify URI + suggested segment(s) and mood tags. The service may use your playlist pool or search Spotify. Payload should include battle metadata.",
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "battle_context": {
+            "type": "object",
+            "properties": {
+              "battle_type": { "type": "string" },
+              "is_boss": { "type": "boolean" },
+              "phase": { "type": "string" },
+              "intensity": { "type": "integer", "description": "1-10" },
+              "characters": { "type": "array", "items": { "type": "string" } },
+              "playlist_uris": { "type": "array", "items": { "type": "string" }, "description": "Optional user's playlist URIs to restrict selection pool" }
+            }
+          },
+          "max_results": { "type": "integer", "default": 1 }
+        },
+        "required": ["battle_context"]
+      },
+      "response_schema": {
+        "type": "object",
+        "properties": {
+          "selections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "spotify_uri": { "type": "string" },
+                "confidence": { "type": "number" },
+                "phase_segments": { "type": "array", "items": { "type": "object", "properties": { "phase": { "type": "string" }, "start_ms": { "type": "integer" }, "end_ms": { "type": "integer" } } } },
+                "mood_tags": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "GetPlaybackStatus",
+      "method": "GET",
+      "path": "/status",
+      "description": "Get current playback state: playing_uri, position_ms, is_playing, current_phase, queue."
+    },
+    {
+      "name": "SetVolume",
+      "method": "POST",
+      "path": "/volume",
+      "description": "Set playback volume (0-100).",
+      "request_schema": { "type": "object", "properties": { "volume_percent": { "type": "integer", "minimum": 0, "maximum": 100 } }, "required": ["volume_percent"] }
+    },
+    {
+      "name": "CatalogCharacters",
+      "method": "GET",
+      "path": "/characters",
+      "description": "Return saved character voice definitions (name, archetype, voice_id, voice_settings, sample_phrases)."
+    },
+    {
+      "name": "UploadCharacterVoice",
+      "method": "POST",
+      "path": "/characters",
+      "description": "Create/update a character voice entry in the service (voice_id must be a valid ElevenLabs voice id).",
+      "request_schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "archetype": { "type": "string" },
+          "sub_archetype": { "type": "string" },
+          "voice_id": { "type": "string" },
+          "voice_settings": { "type": "object" },
+          "sample_phrases": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["name", "voice_id"]
+      }
+    }
+  ]
 }
