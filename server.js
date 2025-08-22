@@ -1,127 +1,182 @@
-// server.js
-const express = require("express");
-const cors = require("cors");
-const axios = require("axios");
-const SpotifyWebApi = require("spotify-web-api-node");
+import express from "express";
+import cors from "cors";
+import axios from "axios";
+import dotenv from "dotenv";
+import SpotifyWebApi from "spotify-web-api-node";
+import fs from "fs";
+
+dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- ENV VARIABLES ---
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
-const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
-const SPOTIFY_REFRESH_TOKEN = process.env.SPOTIFY_REFRESH_TOKEN;
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-
-// --- SPOTIFY SETUP ---
+// ---------------- SPOTIFY SETUP ----------------
 const spotifyApi = new SpotifyWebApi({
-  clientId: SPOTIFY_CLIENT_ID,
-  clientSecret: SPOTIFY_CLIENT_SECRET,
-  redirectUri: "https://projectxmusic.onrender.com/callback",
+  clientId: process.env.SPOTIFY_CLIENT_ID,
+  clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+  redirectUri: "http://localhost:3000/callback"
 });
 
-spotifyApi.setRefreshToken(SPOTIFY_REFRESH_TOKEN);
+spotifyApi.setRefreshToken(process.env.SPOTIFY_REFRESH_TOKEN);
 
 async function refreshSpotifyToken() {
   try {
     const data = await spotifyApi.refreshAccessToken();
     spotifyApi.setAccessToken(data.body["access_token"]);
-    console.log("Spotify token refreshed.");
   } catch (err) {
-    console.error("Error refreshing Spotify token:", err.message);
+    console.error("Error refreshing Spotify token:", err);
   }
 }
 
-// Refresh every 50 min
-setInterval(refreshSpotifyToken, 50 * 60 * 1000);
+// refresh every 30 minutes
+setInterval(refreshSpotifyToken, 1000 * 60 * 30);
 refreshSpotifyToken();
 
-// --- ELEVENLABS SETUP ---
-const elevenLabsTTS = async (voiceId, text, emotion = "neutral") => {
-  try {
-    const res = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        text,
-        voice_settings: {
-          stability: 0.6,
-          similarity_boost: 0.85,
-          style: emotion, // can be "neutral", "angry", "sad", "happy"
-        },
-      },
-      {
-        headers: {
-          "xi-api-key": ELEVENLABS_API_KEY,
-          "Content-Type": "application/json",
-          Accept: "audio/mpeg",
-        },
-        responseType: "arraybuffer",
-      }
-    );
-    return res.data;
-  } catch (err) {
-    console.error("Error generating voice:", err.message);
-    throw err;
+// ---------------- ELEVENLABS SETUP ----------------
+const elevenApi = axios.create({
+  baseURL: "https://api.elevenlabs.io/v1",
+  headers: {
+    "xi-api-key": process.env.ELEVENLABS_API_KEY,
+    "accept": "audio/mpeg",
+    "Content-Type": "application/json"
   }
-};
+});
 
-// --- ROUTES ---
+// ---------------- ROUTES ----------------
 
-// Test
+// Health check
 app.get("/", (req, res) => {
-  res.send("✅ Project X Music & Voice API is running");
+  res.json({ status: "Project X API running" });
 });
 
-// 🎵 Battle music auto-select
-app.post("/battle-music", async (req, res) => {
-  const { phase = "normal", context = "battle" } = req.body;
+// Play battle music
+app.post("/play-music", async (req, res) => {
+  const { battleContext, manualSongUri } = req.body;
 
   try {
-    // Pick query dynamically
-    let query = "epic orchestral";
-    if (context === "boss") query = "boss battle soundtrack";
-    if (phase === "phase2") query = "intense battle theme";
-    if (phase === "climax") query = "final boss theme";
+    await refreshSpotifyToken();
 
-    const searchRes = await spotifyApi.searchTracks(query, { limit: 10 });
-    const tracks = searchRes.body.tracks.items;
+    let trackUri = manualSongUri;
+    if (!trackUri) {
+      // Example: auto-pick track based on context
+      if (battleContext.includes("boss")) {
+        const search = await spotifyApi.searchTracks("epic orchestral battle");
+        trackUri = search.body.tracks.items[0].uri;
+      } else {
+        const search = await spotifyApi.searchTracks("action game soundtrack");
+        trackUri = search.body.tracks.items[0].uri;
+      }
+    }
 
-    if (!tracks.length) return res.status(404).json({ error: "No songs found" });
+    await spotifyApi.play({ uris: [trackUri] });
 
-    // Pick random track
-    const chosen = tracks[Math.floor(Math.random() * tracks.length)];
-    res.json({
-      track: {
-        name: chosen.name,
-        artist: chosen.artists.map((a) => a.name).join(", "),
-        uri: chosen.uri,
-        preview_url: chosen.preview_url,
-      },
-      phase,
-      context,
-    });
+    res.json({ success: true, playing: trackUri });
   } catch (err) {
-    console.error("Error fetching battle music:", err.message);
-    res.status(500).json({ error: "Failed to fetch music" });
+    console.error("Spotify error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to play music" });
   }
 });
 
-// 🔊 Character voice w/ emotion
-app.post("/voice", async (req, res) => {
-  const { voiceId, text, emotion = "neutral" } = req.body;
+// Generate character voice with emotion
+app.post("/generate-voice", async (req, res) => {
+  const { character, text, emotion } = req.body;
 
   try {
-    const audio = await elevenLabsTTS(voiceId, text, emotion);
+    // You’d map character -> voice_id from your earlier config
+    const voiceIdMap = {
+      Simba: "ypyNBxQSnKxwAkJKfQf6",
+      "Yuji Itadori": "EeiCKO3ccklO2iPh9Rmo",
+      Legoshi: "p7MXEPYDLZT8KV35ahIO",
+      Louis: "tHqiMoxT3OawRFrLpG42",
+      Haru: "Z6sWvoG92hsaujmIokrm"
+    };
+
+    const voiceId = voiceIdMap[character] || "default";
+
+    const payload = {
+      text: `[${emotion}] ${text}`, // simple tagging for emotion
+      voice_settings: { stability: 0.6, similarity_boost: 0.8 }
+    };
+
+    const response = await elevenApi.post(
+      `/text-to-speech/${voiceId}`,
+      payload,
+      { responseType: "arraybuffer" }
+    );
+
     res.set("Content-Type", "audio/mpeg");
-    res.send(audio);
+    res.send(response.data);
   } catch (err) {
-    res.status(500).json({ error: "Voice generation failed" });
+    console.error("ElevenLabs error:", err.response?.data || err.message);
+    res.status(500).json({ error: "Failed to generate voice" });
   }
 });
 
-// --- START SERVER ---
+// ---------------- OPENAPI SCHEMA ----------------
+app.get("/openapi.json", (req, res) => {
+  const schema = {
+    openapi: "3.0.1",
+    info: {
+      title: "Project X Control API",
+      description: "Endpoints for Spotify battle music and ElevenLabs voices with emotion.",
+      version: "1.0.0"
+    },
+    servers: [{ url: process.env.SERVER_URL || "http://localhost:3000" }],
+    paths: {
+      "/play-music": {
+        post: {
+          summary: "Play or switch battle music",
+          operationId: "playMusic",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    battleContext: { type: "string" },
+                    manualSongUri: { type: "string" }
+                  },
+                  required: ["battleContext"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Music started" } }
+        }
+      },
+      "/generate-voice": {
+        post: {
+          summary: "Generate character voice line",
+          operationId: "generateVoice",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    character: { type: "string" },
+                    text: { type: "string" },
+                    emotion: { type: "string" }
+                  },
+                  required: ["character", "text"]
+                }
+              }
+            }
+          },
+          responses: { "200": { description: "Voice generated" } }
+        }
+      }
+    }
+  };
+
+  res.json(schema);
+});
+
+// ---------------- START SERVER ----------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`✅ Project X API running on port ${PORT}`);
 });
